@@ -2,9 +2,9 @@
 ![progress](https://img.shields.io/badge/progress-developing-yellow.svg)
 ![contributions](https://img.shields.io/badge/contributions-welcome-green.svg)
 <br>
-![Unity Version](https://img.shields.io/badge/Unity%20Plugin-4.6.0-808080.svg)
-![Android Version](https://img.shields.io/badge/Android%20SDK-4.5.0-808080.svg)
-![iOS Version](https://img.shields.io/badge/iOS%20SDK-4.6.1-808080.svg)
+![Unity Version](https://img.shields.io/badge/Unity%20Plugin-4.7.0-808080.svg)
+![Android Version](https://img.shields.io/badge/Android%20SDK-4.6.4-808080.svg)
+![iOS Version](https://img.shields.io/badge/iOS%20SDK-4.7.2-808080.svg)
 
 # AdColony SDK Unity Plugin
 - [Requirements](#requirements)
@@ -26,11 +26,15 @@
     - Case-insensitive file system, see Unity issues: [feedback.unity3d.com](https://feedback.unity3d.com/suggestions/editor-support-casesensitive-f), [forum.unity.com](https://forum.unity.com/threads/is-unity-ever-going-to-support-a-case-sensitive-filesystem.412139/)
 - [Unity 5.x+](https://unity3d.com/get-unity/download)
 - [Android SDK](https://developer.android.com/studio/#downloads)
+- [Cocoapods](https://cocoapods.org/) >= 1.10 for iOS
 
 # Overview
 AdColony delivers zero-buffering, [full-screen Instant-Play™ HD video](https://www.adcolony.com/technology/instant-play/), [interactive Aurora™ Video](https://www.adcolony.com/technology/auroravideo), and Aurora™ Playable ads that can be displayed anywhere within your application. Our advertising SDK is trusted by the world’s top gaming and non-gaming publishers, delivering them the highest monetization opportunities from brand and performance advertisers. AdColony’s SDK can monetize a wide range of ad formats including in-stream/pre-roll, out-stream/interstitial and V4VC™, a secure system for rewarding users of your app with virtual currency upon the completion of video and playable ads.
 
 # Release Notes
+## v4.7.0.0 (2021/09/23)
+* Updated to AdColony SDK 4.7.2 (iOS) and SDK 4.6.4 (Android).
+
 ## v4.6.0.0 (2021/05/13)
 * Fixed ExternalDependencyManager problems and cleaned out warnings.
 * Updated Android release process.
@@ -137,13 +141,6 @@ AdColony delivers zero-buffering, [full-screen Instant-Play™ HD video](https:/
 See the full [release notes](https://github.com/AdColony/AdColony-Unity-SDK-3/blob/master/CHANGELOG.md) for more details.
 
 # How to Build
-
-The Unity plugin requires the native iOS repository in the `Plugin/src/sdks` directory. You can pull it down using the following command:
-
-```
-cd Plugin/src/sdks
-git clone https://github.com/AdColony/AdColony-iOS-SDK.git
-```
 
 To build the plugin, use the makefile from the Plugin folder:
 

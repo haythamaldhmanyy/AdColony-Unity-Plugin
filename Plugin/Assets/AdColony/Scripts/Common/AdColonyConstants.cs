@@ -68,9 +68,9 @@
         public static string CONSENT_STRING = "_adc_consent_string";
         public static string CONSENT_REQUIRED = "_adc_required";
 
-        public const string AdapterVersion = "4.6.0";
-        public const string AndroidSDKVersion = "4.5.0";
-        public const string iOSSDKVersion = "4.6.1";
+        public const string AdapterVersion = "4.7.0";
+        public const string AndroidSDKVersion = "4.6.4";
+        public const string iOSSDKVersion = "4.7.2";
     }
 
     public class PIEConstants

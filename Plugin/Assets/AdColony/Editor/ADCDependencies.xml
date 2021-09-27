@@ -18,7 +18,7 @@
 
     </androidPackage>
 
-    <androidPackage spec="com.adcolony:sdk:4.5.0">
+    <androidPackage spec="com.adcolony:sdk:4.6.4">
 
       <repositories>
         <repository>https://repo1.maven.org/maven2</repository>
@@ -27,5 +27,9 @@
     </androidPackage>
 
   </androidPackages>
+  
+  <iosPods>
+    <iosPod name="AdColony" version="4.7.2" minTargetSdk="9.0" />
+  </iosPods>
 
 </dependencies>

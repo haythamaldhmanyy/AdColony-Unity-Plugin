@@ -6,7 +6,7 @@ buildscript {
     }
     ext {
         gradleVersion = "4.1.3"
-        adcolonyVersion = "4.5.0"
+        adcolonyVersion = "4.6.4"
     }
     dependencies {
         classpath "com.android.tools.build:gradle:$gradleVersion"

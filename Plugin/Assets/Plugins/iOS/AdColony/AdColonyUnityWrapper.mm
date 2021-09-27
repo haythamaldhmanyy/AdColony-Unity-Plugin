@@ -80,7 +80,7 @@ NSString *getGUID() {
              @"expired": @(self.expired),
              @"audio_enabled": @(self.audioEnabled),
              @"iap_enabled": @(self.iapEnabled)};
-    
+
 }
 
 - (NSString *)serializeForUnityWithId:(NSString *)adId {
@@ -94,12 +94,21 @@ NSString *getGUID() {
 
 @end
 
+@interface AdcAdsUnityInterstitialHolder : NSObject<AdColonyInterstitialDelegate>
+
+@property (nonatomic, strong, readonly, nullable) AdColonyInterstitial *ad;
+@property (nonatomic, strong, readonly, nonnull) NSString *uuid;
+@property (nonatomic, strong, readonly, nonnull) NSString *zoneId;
+
+- (instancetype)initWithAdOptions:(nullable AdColonyAdOptions *)options UUID:(nonnull NSString *)uuid zoneId:(nonnull NSString *)zoneId;
+
+@end
 
 @interface AdcAdsUnityController : NSObject
 
 @property (nonatomic, copy) NSString *managerName;
 @property (nonatomic, copy) NSString *adapterVersion;
-@property (nonatomic, strong) NSMutableDictionary *interstitialAds;
+@property (nonatomic, strong) NSMutableDictionary<NSString *, AdcAdsUnityInterstitialHolder *> *interstitialAds;
 @property (nonatomic, strong) NSMutableDictionary *bannerAds;
 @property (nonatomic, copy) NSString *appOptionsJson;
 
@@ -168,13 +177,13 @@ typedef enum : NSInteger {
 - (void)requestAdViewInZone:(NSString *)zoneId withSize:(NSInteger)adSize location:(NSInteger)adLocation andOptions:(NSString *)adOptionsJson {
     self.zoneID = zoneId;
     self.adViewLocation = adLocation;
-    
+
     AdColonyAdOptions *adOptions = nil;
     if (adOptionsJson.length) {
         adOptions = [[AdColonyAdOptions alloc] init];
         [adOptions setupWithJson:adOptionsJson];
     }
-    
+
     AdColonyAdSize size;
     switch (adSize) {
         case 1:
@@ -193,13 +202,13 @@ typedef enum : NSInteger {
             size = kAdColonyAdSizeBanner;
             break;
     }
-    
+
     UIViewController *viewController = GetAppController().rootViewController;
     [AdColony requestAdViewInZone:zoneId withSize:size andOptions:adOptions viewController:viewController andDelegate:self];
 }
 
 - (void)destroyAdView {
-    
+
     if (self.adView) {
         [self.adView destroy];
         self.adView = nil;
@@ -261,7 +270,7 @@ typedef enum : NSInteger {
     UnityAppController* unityAppController = GetAppController();
     CGFloat centeredX = (unityAppController.rootView.bounds.size.width - adView.bounds.size.width) / 2;
     CGFloat centeredY = (unityAppController.rootView.bounds.size.height - adView.bounds.size.height) / 2;
-    
+
     switch (self.adViewLocation) {
         case AdViewLocationTop:
             frame = CGRectMake(centeredX, 0, adView.bounds.size.width, adView.bounds.size.height);
@@ -292,8 +301,69 @@ typedef enum : NSInteger {
         default:
             break;
     }
-    
+
     return frame;
+}
+
+@end
+
+@implementation AdcAdsUnityInterstitialHolder
+
+- (instancetype)initWithAdOptions:(AdColonyAdOptions *)options UUID:(NSString *)uuid zoneId:(NSString *)zoneId {
+    if ((self = [super init]) != nil) {
+        _uuid = uuid;
+        _zoneId = zoneId;
+
+        [AdColony requestInterstitialInZone:zoneId options:options andDelegate:self];
+    }
+    return self;
+}
+
+- (void)adColonyInterstitialDidLoad:(AdColonyInterstitial *)interstitial {
+    _ad = interstitial;
+    [AdcAdsUnityController sendUnityMessage:[interstitial serializeForUnityWithId:_uuid] toMethod:"_OnRequestInterstitial"];
+}
+
+- (void)adColonyInterstitialDidFailToLoad:(AdColonyAdRequestError *)error {
+    [AdcAdsUnityController sharedInstance].interstitialAds[_uuid] = nil;
+
+    NSDictionary *const dict = @{
+        @"error_code": @(error.code),
+        @"zone_id": ADC_NSSTRING_OR_EMPTY(_zoneId)
+    };
+    [AdcAdsUnityController sendUnityMessage:[dict toJsonString] toMethod:"_OnRequestInterstitialFailed"];
+}
+
+- (void)adColonyInterstitialWillOpen:(AdColonyInterstitial *)interstitial {
+    NSString *const message = [interstitial serializeForUnityWithId:_uuid];
+    [AdcAdsUnityController sendUnityMessage:message toMethod:"_OnOpened"];
+    [AdcAdsUnityController sendUnityMessage:message toMethod:"_OnAudioStarted"];
+}
+
+- (void)adColonyInterstitialDidClose:(AdColonyInterstitial *)interstitial {
+    NSString *const message = [interstitial serializeForUnityWithId:_uuid];
+    [AdcAdsUnityController sendUnityMessage:message toMethod:"_OnClosed"];
+    [AdcAdsUnityController sendUnityMessage:message toMethod:"_OnAudioStopped"];
+}
+
+- (void)adColonyInterstitialExpired:(AdColonyInterstitial *)interstitial {
+    [AdcAdsUnityController sendUnityMessage:[interstitial serializeForUnityWithId:_uuid] toMethod:"_OnExpiring"];
+}
+
+- (void)adColonyInterstitialWillLeaveApplication:(AdColonyInterstitial *)interstitial {
+    [AdcAdsUnityController sendUnityMessage:[interstitial serializeForUnityWithId:_uuid] toMethod:"_OnLeftApplication"];
+}
+
+- (void)adColonyInterstitialDidReceiveClick:(AdColonyInterstitial *)interstitial {
+    [AdcAdsUnityController sendUnityMessage:[interstitial serializeForUnityWithId:_uuid] toMethod:"_OnClicked"];
+}
+
+- (void)adColonyInterstitial:(AdColonyInterstitial *)interstitial iapOpportunityWithProductId:(NSString *)iapProductID andEngagement:(AdColonyIAPEngagement)engagement {
+    NSMutableDictionary *mutableDict = [NSMutableDictionary dictionary];
+    [mutableDict setObject:[interstitial serializeForUnityWithId:_uuid] forKey:ADC_ON_IAP_OPPORTUNITY_AD_KEY];
+    [mutableDict setObject:ADC_NSSTRING_OR_EMPTY(iapProductID) forKey:ADC_ON_IAP_OPPORTUNITY_IAP_PRODUCT_ID_KEY];
+    [mutableDict setObject:@((int)engagement) forKey:ADC_ON_IAP_OPPORTUNITY_ENGAGEMENT_KEY];
+    [AdcAdsUnityController sendUnityMessage:[mutableDict toJsonString] toMethod:"_OnIAPOpportunity"];
 }
 
 @end
@@ -311,15 +381,15 @@ void _AdcSetManagerNameAds(const char *managerName, const char *adapterVersion) 
 
 void _AdcConfigure(const char *appId_, const char *appOptionsJson_, int zoneIdsCount_, const char *zoneIds_[]) {
     NSString *appId = GetStringParamOrNil(appId_);
-    
+
     NSMutableArray *zoneIds = @[].mutableCopy;
     for (int i = 0; i < zoneIdsCount_; ++i) {
         [zoneIds addObject:GetStringParamOrNil(zoneIds_[i])];
     }
-    
+
     NSString *appOptionsJson = GetStringParamOrNil(appOptionsJson_);
     [AdcAdsUnityController sharedInstance].appOptionsJson = appOptionsJson;
-    
+
     // SDK-40 appOptions can no longer be nil all the time; the metadata
     // regarding the plugin must be set now
     AdColonyAppOptions *appOptions = [[AdColonyAppOptions alloc] init];
@@ -328,14 +398,14 @@ void _AdcConfigure(const char *appId_, const char *appOptionsJson_, int zoneIdsC
     }
     [appOptions setPlugin:ADCUnity];
     [appOptions setPluginVersion:[AdcAdsUnityController sharedInstance].adapterVersion];
-    
-    
-    
+
+
+
     [AdColony configureWithAppID:appId zoneIDs:zoneIds options:appOptions completion:^(NSArray<AdColonyZone *> *zones) {
         NSMutableArray *zoneJsonArray = [NSMutableArray array];
         for (AdColonyZone *zone in zones) {
             [zoneJsonArray addObject:[zone toJsonString]];
-            
+
             if (zone.rewarded) {
                 // For each zone returned that is also a rewarded zone, register a callback that will then call _OnRewardGranted.
                 NSString *zoneID = zone.identifier;
@@ -348,7 +418,7 @@ void _AdcConfigure(const char *appId_, const char *appOptionsJson_, int zoneIdsC
                 }];
             }
         }
-        
+
         [AdcAdsUnityController sendUnityMessage:[zoneJsonArray toJsonString] toMethod:"_OnConfigure"];
     }];
 }
@@ -360,10 +430,10 @@ const char *_AdcGetSDKVersion() {
 void _AdcShowInterstitialAd(const char *id) {
     NSString *adId = GetStringParamOrNil(id);
     if (adId) {
-        AdColonyInterstitial *ad = [[AdcAdsUnityController sharedInstance].interstitialAds objectForKey:adId];
-        if (ad) {
+        AdcAdsUnityInterstitialHolder *holder = [[AdcAdsUnityController sharedInstance].interstitialAds objectForKey:adId];
+        if (holder) {
             UnityAppController* unityAppController = GetAppController();
-            [ad showWithPresentingViewController:unityAppController.rootViewController];
+            [holder.ad showWithPresentingViewController:unityAppController.rootViewController];
             return;
         }
     }
@@ -372,11 +442,7 @@ void _AdcShowInterstitialAd(const char *id) {
 void _AdcCancelInterstitialAd(const char *id) {
     NSString *adId = GetStringParamOrNil(id);
     if (adId) {
-        AdColonyInterstitial *ad = [[AdcAdsUnityController sharedInstance].interstitialAds objectForKey:adId];
-        if (ad) {
-            [ad cancel];
-            return;
-        }
+        [[AdcAdsUnityController sharedInstance].interstitialAds[adId].ad cancel];
     }
 }
 
@@ -392,60 +458,9 @@ void _AdcRequestInterstitialAd(const char *zoneId, const char *adOptionsJson) {
         adOptions = [[AdColonyAdOptions alloc] init];
         [adOptions setupWithJson:myAdOptionsJson];
     }
-    
-    NSString *zoneIds = GetStringParam(zoneId);
-    
-    [AdColony requestInterstitialInZone:zoneIds
-                                options:adOptions
-                                success:^(AdColonyInterstitial *ad) {
-        NSString *adId = getGUID();
-        [AdcAdsUnityController sharedInstance].interstitialAds[adId] = ad;
-        
-        weakify(ad);
-        [ad setOpen:^{
-            strongify(ad);
-            [AdcAdsUnityController sendUnityMessage:[ad serializeForUnityWithId:adId] toMethod:"_OnOpened"];
-        }];
-        [ad setClose:^{
-            strongify(ad);
-            [AdcAdsUnityController sendUnityMessage:[ad serializeForUnityWithId:adId] toMethod:"_OnClosed"];
-        }];
-        [ad setAudioStop:^{
-            strongify(ad);
-            [AdcAdsUnityController sendUnityMessage:[ad serializeForUnityWithId:adId] toMethod:"_OnAudioStopped"];
-        }];
-        [ad setAudioStart:^{
-            strongify(ad);
-            [AdcAdsUnityController sendUnityMessage:[ad serializeForUnityWithId:adId] toMethod:"_OnAudioStarted"];
-        }];
-        [ad setExpire:^{
-            strongify(ad);
-            [AdcAdsUnityController sendUnityMessage:[ad serializeForUnityWithId:adId] toMethod:"_OnExpiring"];
-        }];
-        [ad setLeftApplication:^{
-            strongify(ad);
-            [AdcAdsUnityController sendUnityMessage:[ad serializeForUnityWithId:adId] toMethod:"_OnLeftApplication"];
-        }];
-        [ad setClick:^{
-            strongify(ad);
-            [AdcAdsUnityController sendUnityMessage:[ad serializeForUnityWithId:adId] toMethod:"_OnClicked"];
-        }];
-        [ad setIapOpportunity:^(NSString * _Nonnull iapProductID, AdColonyIAPEngagement engagement) {
-            strongify(ad);
-            NSMutableDictionary *mutableDict = [NSMutableDictionary dictionary];
-            [mutableDict setObject:[ad serializeForUnityWithId:adId] forKey:ADC_ON_IAP_OPPORTUNITY_AD_KEY];
-            [mutableDict setObject:ADC_NSSTRING_OR_EMPTY(iapProductID) forKey:ADC_ON_IAP_OPPORTUNITY_IAP_PRODUCT_ID_KEY];
-            [mutableDict setObject:@((int)engagement) forKey:ADC_ON_IAP_OPPORTUNITY_ENGAGEMENT_KEY];
-            [AdcAdsUnityController sendUnityMessage:[mutableDict toJsonString] toMethod:"_OnIAPOpportunity"];
-        }];
-        
-        [AdcAdsUnityController sendUnityMessage:[ad serializeForUnityWithId:adId] toMethod:"_OnRequestInterstitial"];
-    }
-                                failure:^(AdColonyAdRequestError *error) {
-        NSDictionary *dict = @{@"error_code": @(error.code),
-                               @"zone_id": ADC_NSSTRING_OR_EMPTY(zoneIds)};
-        [AdcAdsUnityController sendUnityMessage:[dict toJsonString] toMethod:"_OnRequestInterstitialFailed"];
-    }];
+
+    AdcAdsUnityInterstitialHolder *const holder = [[AdcAdsUnityInterstitialHolder alloc] initWithAdOptions:adOptions UUID:getGUID() zoneId:GetStringParam(zoneId)];
+    [AdcAdsUnityController sharedInstance].interstitialAds[holder.uuid] = holder;
 }
 
 
@@ -486,12 +501,12 @@ const char *_AdcGetZone(const char *zoneId) {
     if (zoneString == nil) {
         return nil;
     }
-    
+
     AdColonyZone *zone = [AdColony zoneForID:zoneString];
     if (zone == nil) {
         return nil;
     }
-    
+
     return MakeStringCopy([zone toJsonString]);
 }
 
@@ -501,7 +516,7 @@ const char *_AdcGetUserID() {
 
 void _AdcSetAppOptions(const char *appOptionsJson) {
     [AdcAdsUnityController sharedInstance].appOptionsJson = GetStringParam(appOptionsJson);
-    
+
     AdColonyAppOptions *appOptions = [[AdColonyAppOptions alloc] init];
     [appOptions setupWithJson:[AdcAdsUnityController sharedInstance].appOptionsJson];
     [AdColony setAppOptions:appOptions];

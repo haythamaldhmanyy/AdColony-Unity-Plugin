@@ -1,4 +1,7 @@
 # Change Log
+## v4.7.0.0 (2021/09/23)
+* Updated to AdColony SDK 4.7.2 (iOS) and SDK 4.6.4 (Android).
+
 ## v4.6.0.0 (2021/05/13)
 * Fixed ExternalDependencyManager problems and cleaned out warnings.
 * Updated Android release process.
